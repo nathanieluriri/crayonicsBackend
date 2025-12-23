@@ -19,7 +19,6 @@ from pymongo import MongoClient
 import redis
 from apscheduler.triggers.interval import IntervalTrigger
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from security.encrypting_jwt import decode_jwt_token
 
@@ -86,7 +85,7 @@ app = FastAPI(
 app.add_middleware(RequestTimingMiddleware)
 app.add_middleware(SessionMiddleware, secret_key="some-random-string")
 
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 app.add_middleware(HTTPSRedirectMiddleware)
 
 redis_url = os.getenv("CELERY_BROKER_URL") or os.getenv("REDIS_URL") \
