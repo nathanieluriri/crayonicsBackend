@@ -1,4 +1,4 @@
-name: Deploy to EC2  
+name: Deploy to PROD
 
 on:
   push:
@@ -7,18 +7,20 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: Production
+    environment: Production    # Uses the Production environment secrets
     steps:
-      - name: SSH & Deploy to EC2  
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: SSH & Deploy to PROD
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST }}          # your EC2 public IP or DNS
-          username: ubuntu                       # use ubuntu (default for AWS Ubuntu AMIs)
-          key: ${{ secrets.EC2_SSH_KEY }}        # your private PEM key (add to GitHub secrets)
+          host: ${{ secrets.HOST }}       # Production environment secret for EC2 host
+          username: ubuntu                # default AWS Ubuntu AMI user
+          key: ${{ secrets.KEY }}         # Production environment secret for private SSH key
           port: 22
           script: |
-            cd crayonicsBackend         # adjust if your code lives elsewhere
-            git pull origin master               # or main
+            cd crayonicsBackend            
+            git pull origin master         
             sudo docker compose down
             sudo docker compose up --build -d
-            
