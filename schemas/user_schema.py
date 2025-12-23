@@ -2,10 +2,23 @@ from schemas.imports import *
 from pydantic import AliasChoices, Field
 import time
 from security.hash import hash_password
+
+class UserSignUp(BaseModel):
+    firstName:str
+    lastName:str    
+    email:EmailStr
+    password:str | bytes
+    
+    
+class UserLogin(BaseModel):
+    email:EmailStr
+    password:str | bytes
+    
+    
 class UserBase(BaseModel):
     # Add other fields here 
-    firstName:str
-    lastName:str
+    firstName:Optional[str]=None
+    lastName:Optional[str]=None
     loginType:LoginType
     email:EmailStr
     password:str | bytes

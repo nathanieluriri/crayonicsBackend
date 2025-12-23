@@ -10,8 +10,10 @@ from schemas.response_schema import APIResponse
 from schemas.tokens_schema import accessTokenOut
 from schemas.user_schema import (
     UserCreate,
+    UserLogin,
     UserOut,
     UserBase,
+    UserSignUp,
     UserUpdate,
     UserRefresh,
     LoginType,
@@ -106,14 +108,16 @@ async def get_my_users(token:accessTokenOut = Depends(verify_token_user_role)):
 
 
 @router.post("/signup", response_model_exclude={"data": {"password"}},response_model=APIResponse[UserOut])
-async def signup_new_user(user_data:UserBase):
-    new_user = UserCreate(**user_data.model_dump())
+async def signup_new_user(user_data:UserSignUp):
+    
+    new_user = UserCreate(**user_data.model_dump(),loginType=LoginType.password)
     items = await add_user(user_data=new_user)
     return APIResponse(status_code=200, data=items, detail="Fetched successfully")
 
 
 @router.post("/login",response_model_exclude={"data": {"password"}}, response_model=APIResponse[UserOut])
-async def login_user(user_data:UserBase):
+async def login_user(user_data:UserLogin):
+    user_data=UserBase(**user_data.model_dump(),loginType=LoginType.password)
     items = await authenticate_user(user_data=user_data)
     return APIResponse(status_code=200, data=items, detail="Fetched successfully")
 
@@ -174,7 +178,7 @@ async def update_driver_password_while_logged_in(driver_details:UserUpdatePasswo
 
 @router.post("/password-reset/request",response_model=APIResponse[ResetPasswordInitiationResponse] )
 async def start_password_reset_process_for_driver_that_forgot_password(driver_details:ResetPasswordInitiation):
-    driver =  await user_reset_password_intiation(driver_details=driver_details)   
+    driver =  await user_reset_password_intiation(user_details=driver_details)   
     return APIResponse(data = driver,status_code=200,detail="Successfully updated profile")
 
 

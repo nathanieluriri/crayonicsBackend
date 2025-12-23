@@ -199,7 +199,7 @@ async def update_user_by_id(driver_id: str, driver_data: UserUpdate,is_password_
     if not result:
         raise HTTPException(status_code=404, detail="Driver not found or update failed")
     if is_password_getting_changed==True:
-        result = celery_app.send_task("celery_worker.run_async_task",args=["delete_tokens",{"userId": driver_id} ])
+        celery_result = celery_app.send_task("celery_worker.run_async_task",args=["delete_tokens",{"userId": driver_id} ])
     return result
 
 
@@ -281,7 +281,7 @@ async def user_reset_password_conclusion(
         raise HTTPException(status_code=404,detail="Reset token not found or expired")
 
     # 3️⃣ Validate token user type
-    if token.userType != UserType.driver:
+    if token.userType != UserType.member:
         raise HTTPException(status_code=403,detail="Reset token is not for a driver")
 
     # 4️⃣ Validate OTP
