@@ -54,9 +54,9 @@ services:
       - redis_data:/data
   flower:
     build: .                       # 👈 use your app image
-    command: celery -A celery_worker.celery_app flower --port=5555
+    command: celery -A celery_worker.celery_app flower --port=5556
     ports:
-      - "5555:5555"
+      - "5556:5556"
     environment:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
