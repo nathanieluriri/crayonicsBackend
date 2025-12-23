@@ -1,4 +1,5 @@
 
+import asyncio
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List
@@ -10,14 +11,16 @@ from repositories.user_repo import (
     update_user,
     delete_user,
 )
+from schemas.imports import AccountStatus, LoginType
 from schemas.user_schema import UserCreate, UserUpdate, UserOut,UserBase,UserRefresh
 from security.hash import check_password
-from security.encrypting_jwt import create_jwt_member_token
+from security.encrypting_jwt import create_jwt_member_token, create_jwt_token
 from repositories.tokens_repo import add_refresh_tokens, add_access_tokens, accessTokenCreate,accessTokenOut,refreshTokenCreate
 from repositories.tokens_repo import get_refresh_tokens,get_access_tokens,delete_access_token,delete_refresh_token,delete_all_tokens_with_user_id
 from authlib.integrations.starlette_client import OAuth
 import os
 from dotenv import load_dotenv
+import httpx
 
 
 load_dotenv()
@@ -31,39 +34,76 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'},
 )
+
+
+async def revoke_google_token(token: str):
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            "https://oauth2.googleapis.com/revoke",
+            params={"token": token},
+            headers={"content-type": "application/x-www-form-urlencoded"},
+        )
+
+
+
 async def add_user(user_data: UserCreate) -> UserOut:
-    """adds an entry of UserCreate to the database and returns an object
+    """adds an entry of RiderCreate to the database and returns an object
 
     Returns:
-        _type_: UserOut
+        _type_: RiderOut
     """
-    user =  await get_user(filter_dict={"email":user_data.email})
-    if user==None:
-        new_user= await create_user(user_data)
-        access_token = await add_access_tokens(token_data=accessTokenCreate(userId=new_user.id))
-        refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=new_user.id,previousAccessToken=access_token.accesstoken))
-        new_user.password=""
-        new_user.access_token= access_token.accesstoken 
-        new_user.refresh_token = refresh_token.refreshtoken
-        return new_user
+    user =  await get_user(filter_dict={"email":user_data.email.lower()})
+    if user_data.loginType==LoginType.google and user==None:
+        new_rider= await create_user(user_data)
+        access_token = await add_access_tokens(token_data=accessTokenCreate(userId=new_rider.id))
+        refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=new_rider.id,previousAccessToken=access_token.accesstoken))
+        token_activation = True
+        token = create_jwt_token(access_token=access_token.accesstoken,user_id=new_rider.id,user_type="USER",is_activated=token_activation) 
+        new_rider.refresh_token = refresh_token.refreshtoken
+        new_rider.access_token= token
+        return new_rider
+    if user_data.loginType==LoginType.password and user==None:
+        new_rider= await create_user(user_data)
+        if new_rider==None:
+            raise HTTPException(status_code=500,detail="Error In Creation of user ")
+        access_token = await add_access_tokens(token_data=accessTokenCreate(userId=new_rider.id))
+        refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=new_rider.id,previousAccessToken=access_token.accesstoken))
+        new_rider.password=""
+        token_activation = True
+        token = create_jwt_token(access_token=access_token.accesstoken,user_id=new_rider.id,user_type="USER",is_activated=token_activation) 
+        new_rider.refresh_token = refresh_token.refreshtoken
+        new_rider.access_token= token
+        return new_rider
     else:
-        raise HTTPException(status_code=409,detail="User Already exists")
-
+        raise HTTPException(status_code=409,detail="Rider Already exists")
 async def authenticate_user(user_data:UserBase )->UserOut:
-    user = await get_user(filter_dict={"email":user_data.email})
-
-    if user != None:
+    user = await get_user(filter_dict={"email":user_data.email.lower()})
+    if user_data.loginType==LoginType.google and user != None:
+        user.password=""
+        access_token = await add_access_tokens(token_data=accessTokenCreate(userId=user.id))
+        refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=user.id,previousAccessToken=access_token.accesstoken))
+        active = user.accountStatus==AccountStatus.ACTIVE
+        token = create_jwt_token(access_token=access_token.accesstoken,user_id=user.id,user_type="USER",is_activated=active)            
+        user.access_token= token
+        user.refresh_token = refresh_token.refreshtoken
+        return user
+    if user_data.loginType==LoginType.google and user == None:
+        
+        return None
+    elif user_data.loginType==LoginType.password and user != None:
         if check_password(password=user_data.password,hashed=user.password ):
             user.password=""
             access_token = await add_access_tokens(token_data=accessTokenCreate(userId=user.id))
             refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=user.id,previousAccessToken=access_token.accesstoken))
-            user.access_token= access_token.accesstoken 
+            active = user.accountStatus==AccountStatus.ACTIVE
+            token = create_jwt_token(access_token=access_token.accesstoken,user_id=user.id,user_type="USER",is_activated=active)            
+            user.access_token= token
             user.refresh_token = refresh_token.refreshtoken
             return user
         else:
             raise HTTPException(status_code=401, detail="Unathorized, Invalid Login credentials")
     else:
-        raise HTTPException(status_code=404,detail="User not found")
+        raise HTTPException(status_code=404,detail="USER not found")
 
 async def refresh_user_tokens_reduce_number_of_logins(user_refresh_data:UserRefresh,expired_access_token):
     refreshObj= await get_refresh_tokens(user_refresh_data.refresh_token)
@@ -74,7 +114,9 @@ async def refresh_user_tokens_reduce_number_of_logins(user_refresh_data:UserRefr
             if user!= None:
                     access_token = await add_access_tokens(token_data=accessTokenCreate(userId=user.id))
                     refresh_token  = await add_refresh_tokens(token_data=refreshTokenCreate(userId=user.id,previousAccessToken=access_token.accesstoken))
-                    user.access_token= access_token.accesstoken 
+                    active = user.accountStatus==AccountStatus.ACTIVE
+                    token = create_jwt_token(access_token=access_token.accesstoken,user_id=user.id,user_type="USER",is_activated=active)
+                    user.access_token= token
                     user.refresh_token = refresh_token.refreshtoken
                     await delete_access_token(accessToken=expired_access_token)
                     await delete_refresh_token(refreshToken=user_refresh_data.refresh_token)
@@ -83,7 +125,7 @@ async def refresh_user_tokens_reduce_number_of_logins(user_refresh_data:UserRefr
         await delete_refresh_token(refreshToken=user_refresh_data.refresh_token)
         await delete_access_token(accessToken=expired_access_token)
   
-    raise HTTPException(status_code=404,detail="Invalid refresh token ")  
+    raise HTTPException(status_code=400,detail="Invalid refresh token ")  
         
 async def remove_user(user_id: str):
     """deletes a field from the database and removes UserCreateobject 
@@ -156,3 +198,41 @@ async def update_user_by_id(driver_id: str, driver_data: UserUpdate,is_password_
         result = celery_app.send_task("celery_worker.run_async_task",args=["delete_tokens",{"userId": driver_id} ])
     return result
 
+
+async def logout_user(user_id: str):
+    """
+    Logs out a user by:
+    - retrieving the user
+    - revoking OAuth tokens (if any)
+    - deleting all local access & refresh tokens
+
+    All operations run concurrently.
+    """
+
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    async def get_user_task():
+        return await get_user(filter_dict={"_id": ObjectId(user_id)})
+
+    async def delete_tokens_task():
+        await delete_all_tokens_with_user_id(userId=user_id)
+
+    # Run DB fetch + token deletion in parallel
+    user, _ = await asyncio.gather(
+        get_user_task(),
+        delete_tokens_task(),
+    )
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Revoke OAuth token AFTER user is known
+    if user.loginType == LoginType.google and getattr(user, "oauth_access_token", None):
+        try:
+            await revoke_google_token(user.oauth_access_token)
+        except Exception:
+            # Never block logout if Google revoke fails
+            pass
+
+    return True

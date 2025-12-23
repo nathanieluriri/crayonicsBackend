@@ -52,7 +52,7 @@ async def verify_token_to_refresh(token: str = Depends(token_auth_scheme)):
     
 
 async def verify_token_user_role(token: str = Depends(token_auth_scheme))->accessTokenOut:
-    decoded_token = await decode_jwt_token(token=token.credentials)
+     
    
     try:
         decoded_token =await decode_jwt_token(token=token.credentials)

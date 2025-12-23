@@ -56,6 +56,11 @@ async def delete_refresh_token(refreshToken:str):
         return True
 
 
+async def delete_access_and_refresh_token_with_user_id(userId:str)->bool:
+     result = await db.refreshToken.delete_many({'userId':userId})
+     result1 = await db.accessToken.delete_many({'userId':userId})
+     return (result.acknowledged and result1.acknowledged)
+
 
 def is_older_than_days(date_value, days=10):
     """
@@ -175,6 +180,7 @@ async def get_refresh_tokens(refreshToken:str)->refreshTokenOut:
     
     
 async def delete_all_tokens_with_user_id(userId:str):
+    
     await db.refreshToken.delete_many(filter={"userId":userId})
     await db.accessToken.delete_many(filter={"userId":userId})
     

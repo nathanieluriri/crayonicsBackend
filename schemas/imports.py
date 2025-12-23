@@ -10,7 +10,8 @@ import time
 
 class LoginType(str, Enum):
     google = "GOOGLE"
-    email = "EMAIL"
+    password = "PASSWORD"
+    passwordless="PASSWORDLESS"
 
 class AccountStatus(str, Enum):
     ACTIVE = "ACTIVE"

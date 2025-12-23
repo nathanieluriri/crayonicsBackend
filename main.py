@@ -8,7 +8,7 @@ from datetime import datetime,timedelta
 from limits.storage import RedisStorage
 import math
 from schemas.response_schema import APIResponse
-from repositories.tokens_repo import get_access_tokens_no_date_check
+from repositories.tokens_repo import get_access_tokens, get_access_tokens_no_date_check
 from limits import parse
 import time   
 import os
@@ -19,6 +19,8 @@ from pymongo import MongoClient
 import redis
 from apscheduler.triggers.interval import IntervalTrigger
 from starlette.middleware.sessions import SessionMiddleware
+
+from security.encrypting_jwt import decode_jwt_token
 
 MONGO_URI = os.getenv("MONGO_URL")
 REDIS_URI = f"redis://{os.getenv('REDIS_HOST', '127.0.0.1')}:{os.getenv('REDIS_PORT', '6379')}/0"
@@ -94,34 +96,44 @@ storage = RedisStorage(
 limiter = FixedWindowRateLimiter(storage)
 
 RATE_LIMITS = {
-    "annonymous": parse("20/minute"),
+    "anonymous": parse("20/minute"),
     "member": parse("60/minute"),
     "admin": parse("140/minute"),
 }
 
+
+
 async def get_user_type(request: Request) -> tuple[str, str]:
-    """
-    Return a tuple of (user_identifier, user_type)
-    You can extract from JWT, headers, or session.
-    """
     auth_header = request.headers.get("Authorization")
+
+    # Anonymous fallback
     if not auth_header or not auth_header.startswith("Bearer "):
-        ip_address = request.headers.get("X-Forwarded-For", request.client.host)
-        user_id = ip_address
-        user_type="annonymous"
-        return user_id, user_type if user_type in RATE_LIMITS else "annonymous"
-    
-    
-    token = auth_header.split(" ")[1] 
-    access_token  =await get_access_tokens_no_date_check(accessToken=token)
-    
-    user_id = access_token.userId
-    
-    user_type = access_token.role
+        ip = request.headers.get("X-Forwarded-For", request.client.host)
+        return ip, "anonymous"
 
- 
-    return user_id, user_type if user_type in RATE_LIMITS else "annonymous"
+    token = auth_header.split(" ", 1)[1]
 
+    try:
+        decoded = await decode_jwt_token(token=token)
+
+        # 🔑 normalize admin vs member JWTs
+        access_token_value = (
+            decoded.get("access_token")
+            or decoded.get("accessToken")
+        )
+
+        if not access_token_value:
+            raise ValueError("access token missing in JWT")
+
+        access_token = await get_access_tokens(
+            accessToken=access_token_value
+        )
+
+        return access_token.userId, access_token.role
+
+    except Exception as e:
+        ip = request.headers.get("X-Forwarded-For", request.client.host)
+        return ip, "anonymous" 
 class RateLimitingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         user_id, user_type = await get_user_type(request)

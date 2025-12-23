@@ -144,3 +144,16 @@ async def update_admin_by_id(admin_id: str, admin_data: AdminUpdate,is_password_
     return result
 
 
+
+
+async def logout_admin(admin_id: str):
+    """
+    Invalidates all active tokens/sessions for the admin.
+    This could:
+    - delete refresh tokens from DB
+    - blacklist access tokens
+    - reset login counters
+    """
+    # implementation detail depends on your auth design
+    await delete_all_tokens_with_admin_id(adminId=admin_id)
+    return True

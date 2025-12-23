@@ -1,5 +1,5 @@
 from schemas.imports import *
-from pydantic import Field
+from pydantic import AliasChoices, Field
 import time
 from security.hash import hash_password
 class UserBase(BaseModel):
@@ -9,6 +9,8 @@ class UserBase(BaseModel):
     loginType:LoginType
     email:EmailStr
     password:str | bytes
+    oauth_access_token:Optional[str]=None
+    oauth_refresh_token:Optional[str]=None
     pass
 
 class UserRefresh(BaseModel):
@@ -18,7 +20,8 @@ class UserRefresh(BaseModel):
 
 
 class UserCreate(UserBase):
-    # Add other fields here 
+    # Add other fields here
+     
     date_created: int = Field(default_factory=lambda: int(time.time()))
     last_updated: int = Field(default_factory=lambda: int(time.time()))
     @model_validator(mode='after')
@@ -31,11 +34,24 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     # Add other fields here 
-    id: Optional[str] = Field(default=None, alias="_id")
+    id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("_id", "id"),
+        serialization_alias="id",
+    )
     date_created: Optional[int] = None
+    accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
     last_updated: Optional[int] = None
-    refresh_token: Optional[str] =None
-    access_token:Optional[str]=None
+    refresh_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("refresh_token", "refreshToken"),
+        serialization_alias="refreshToken",
+    )
+    access_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("access_token", "accessToken"),
+        serialization_alias="accessToken",
+    )
     @model_validator(mode="before")
     @classmethod
     def convert_objectid(cls, values):

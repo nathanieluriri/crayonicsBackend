@@ -20,10 +20,11 @@ from services.admin_service import (
     authenticate_admin,
     retrieve_admin_by_admin_id,
     update_admin,
+    logout_admin as logout_admin_service,
     refresh_admin_tokens_reduce_number_of_logins,
 
 )
-from security.auth import verify_token,verify_token_to_refresh,verify_admin_token
+from security.auth import verify_token_to_refresh,verify_admin_token
 router = APIRouter(prefix="/admins", tags=["Admins"])
             
  
@@ -194,9 +195,43 @@ async def refresh_admin_tokens(
     return APIResponse(status_code=200, data=items, detail="admins items fetched")
 
 
+
+
+@router.post(
+    "/logout",
+    dependencies=[
+        Depends(verify_admin_token),
+        Depends(log_what_admin_does),
+        Depends(check_admin_account_status_and_permissions),
+    ],
+    response_model=APIResponse[None],
+)
+async def logout_admin(
+    token: accessTokenOut = Depends(verify_admin_token),
+):
+    """
+    Logs out the currently authenticated admin.
+
+    This action invalidates the admin’s active session(s) by
+    revoking refresh tokens and/or marking tokens as unusable.
+
+    **Authorization:**  
+    Requires a valid Access Token in the  
+    `Authorization: Bearer <token>` header.
+    """
+
+    await logout_admin_service(admin_id=token.get("userId"))
+
+    return APIResponse(
+        status_code=status.HTTP_200_OK,
+        data=None,
+        detail="Logged out successfully",
+    )
+
+
 @router.delete("/account",dependencies=[Depends(verify_admin_token),Depends(log_what_admin_does)], response_model_exclude_none=True)
 async def delete_admin_account(
-    token: accessTokenOut = Depends(verify_token),
+    token: accessTokenOut = Depends(verify_admin_token),
  
 ):
     """

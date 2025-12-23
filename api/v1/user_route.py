@@ -22,10 +22,11 @@ from services.user_service import (
     retrieve_user_by_user_id,
     update_user,
     update_user_by_id,
+    logout_user as logout_user_service,
     refresh_user_tokens_reduce_number_of_logins,
     oauth
 )
-from security.auth import verify_token,verify_token_to_refresh
+from security.auth import verify_token_to_refresh,verify_token_user_role
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -34,8 +35,8 @@ load_dotenv()
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
-SUCCESS_PAGE_URL = os.getenv("SUCCESS_PAGE_URL", "http://localhost:8080/success")
-ERROR_PAGE_URL   = os.getenv("ERROR_PAGE_URL",   "http://localhost:8080/error")
+SUCCESS_PAGE_URL = os.getenv("SUCCESS_PAGE_URL", "http://localhost:5173/success")
+ERROR_PAGE_URL   = os.getenv("ERROR_PAGE_URL",   "http://localhost:5173/error")
 
 # --- Step 1: Redirect user to Google login ---
 @router.get("/google/auth")
@@ -46,15 +47,18 @@ async def login_with_google_account(request: Request):
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 # --- Step 2: Handle callback from Google ---
+
 @router.get("/auth/callback")
 async def auth_callback_user(request: Request):
     token = await oauth.google.authorize_access_token(request)
     user_info = token.get('userinfo')
-
+    google_access_token = token.get("access_token")
+    google_refresh_token = token.get("refresh_token")
     # Just print or return user info for now
     if user_info:
         print("✅ Google user info:", user_info)
-        rider = UserBase(firstName=user_info['name'],password='',lastName=user_info['given_name'],email=user_info['email'],loginType=LoginType.google)
+        
+        rider = UserBase(firstName=user_info['name'],password='',lastName=user_info['given_name'],email=user_info['email'],loginType=LoginType.google,oauth_access_token= google_access_token,oauth_refresh_token= google_refresh_token)
         data = await authenticate_user(user_data=rider)
         if data==None:
             new_rider = UserCreate(**rider.model_dump())
@@ -81,13 +85,13 @@ async def auth_callback_user(request: Request):
     else:
         raise HTTPException(status_code=400,detail={"status": "failed", "message": "No user info found"})
 
-@router.get("/",response_model_exclude={"data": {"__all__": {"password"}}}, response_model=APIResponse[List[UserOut]],response_model_exclude_none=True,dependencies=[Depends(verify_token)])
+@router.get("/",response_model_exclude={"data": {"__all__": {"password"}}}, response_model=APIResponse[List[UserOut]],response_model_exclude_none=True,dependencies=[Depends(verify_token_user_role)])
 async def list_users(start:int= 0, stop:int=100):
     items = await retrieve_users(start=0,stop=100)
     return APIResponse(status_code=200, data=items, detail="Fetched successfully")
 
-@router.get("/me", response_model_exclude={"data": {"password"}},response_model=APIResponse[UserOut],dependencies=[Depends(verify_token)],response_model_exclude_none=True)
-async def get_my_users(token:accessTokenOut = Depends(verify_token)):
+@router.get("/me", response_model_exclude={"data": {"password"}},response_model=APIResponse[UserOut],dependencies=[Depends(verify_token_user_role)],response_model_exclude_none=True)
+async def get_my_users(token:accessTokenOut = Depends(verify_token_user_role)):
     items = await retrieve_user_by_user_id(id=token.userId)
     return APIResponse(status_code=200, data=items, detail="users items fetched")
 
@@ -114,7 +118,32 @@ async def refresh_user_tokens(user_data:UserRefresh,token:accessTokenOut = Depen
     return APIResponse(status_code=200, data=items, detail="users items fetched")
 
 
-@router.delete("/account",dependencies=[Depends(verify_token)])
-async def delete_user_account(token:accessTokenOut = Depends(verify_token)):
+@router.post("/logout")
+async def logout_user(
+    token: accessTokenOut = Depends(verify_token_user_role),
+):
+    """
+    Logs out the currently authenticated admin.
+
+    This action invalidates the admin’s active session(s) by
+    revoking refresh tokens and/or marking tokens as unusable.
+
+    **Authorization:**  
+    Requires a valid Access Token in the  
+    `Authorization: Bearer <token>` header.
+    """
+
+    await logout_user_service(user_id=token.userId)
+
+    return APIResponse(
+        status_code=status.HTTP_200_OK,
+        data=None,
+        detail="Logged out successfully",
+    )
+
+
+
+@router.delete("/account",dependencies=[Depends(verify_token_user_role)])
+async def delete_user_account(token:accessTokenOut = Depends(verify_token_user_role)):
     result = await remove_user(user_id=token.userId)
     return result

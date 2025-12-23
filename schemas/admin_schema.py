@@ -1,15 +1,20 @@
 from schemas.imports import *
-from pydantic import Field
+from pydantic import AliasChoices, Field
 import time
 from security.hash import hash_password
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, model_validator
+
+from security.permissions import default_get_permissions, default_permissions
 
 class AdminBase(BaseModel):
 
     full_name: str
     email: EmailStr
     password: str | bytes
+    permissionList: Optional[PermissionList] = Field(
+    default_factory=default_get_permissions
+)
 
 
 class AdminLogin(BaseModel):
@@ -35,6 +40,7 @@ class AdminCreate(AdminBase):
 class AdminUpdate(BaseModel):
     # Add other fields here 
     password:Optional[str | bytes]=None
+    
     last_updated: int = Field(default_factory=lambda: int(time.time()))
     @model_validator(mode='after')
     def obscure_password(self):
@@ -43,12 +49,40 @@ class AdminUpdate(BaseModel):
             return self
 class AdminOut(AdminBase):
     # Add other fields here 
-    id: Optional[str] = Field(default=None, alias="_id")
-
-    date_created: Optional[int] = None
-    last_updated: Optional[int] = None
-    refresh_token: Optional[str] =None
-    access_token:Optional[str]=None
+    id: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("_id", "id"),
+        serialization_alias="id",
+    )
+    accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
+    permissionList: Optional[PermissionList] = Field(
+    default_factory=default_permissions
+)
+    invited_by: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("invited_by", "invitedBy"),
+        serialization_alias="invitedBy",
+    )
+    date_created: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("date_created", "dateCreated"),
+        serialization_alias="dateCreated",
+    )
+    last_updated: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("last_updated", "lastUpdated"),
+        serialization_alias="lastUpdated",
+    )
+    refresh_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("refresh_token", "refreshToken"),
+        serialization_alias="refreshToken",
+    )
+    access_token: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("access_token", "accessToken"),
+        serialization_alias="accessToken",
+    )
     @model_validator(mode="before")
     @classmethod
     def convert_objectid(cls, values):
