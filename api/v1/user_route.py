@@ -1,4 +1,5 @@
 
+import re
 from fastapi import APIRouter, HTTPException, Query, Request, status, Path,Depends
 from typing import List
 
@@ -45,9 +46,12 @@ ERROR_PAGE_URL   = os.getenv("ERROR_PAGE_URL",   "http://localhost:5173/error")
 # --- Step 1: Redirect user to Google login ---
 @router.get("/google/auth")
 async def login_with_google_account(request: Request):
-    redirect_uri = request.url_for("auth_callback_user")
+    redirect_uri = str(request.url_for("auth_callback_user"))
+
+    # Force https
+    redirect_uri = re.sub(r"^http://", "https://", redirect_uri)
+
     print("REDIRECT URI:", redirect_uri)
- 
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 # --- Step 2: Handle callback from Google ---
