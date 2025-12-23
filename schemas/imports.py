@@ -7,7 +7,26 @@ from typing import Optional,List,Any
 from enum import Enum
 import time
 
+class UserType(str,Enum):
+    member= "member"
+   
+    admin="admin"
 
+class ResetPasswordInitiation(BaseModel):
+    # Add other fields here
+    email:EmailStr 
+    
+class ResetPasswordInitiationResponse(BaseModel):
+    # Add other fields here
+    resetToken:str
+    
+    
+class ResetPasswordConclusion(BaseModel):
+    # Add other fields here
+    otp:str
+    resetToken:str 
+    password:str 
+    
 class LoginType(str, Enum):
     google = "GOOGLE"
     password = "PASSWORD"

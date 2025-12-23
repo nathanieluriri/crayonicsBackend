@@ -65,3 +65,17 @@ class UserOut(UserBase):
         json_encoders = {
             ObjectId: str  # automatically converts ObjectId → str
         }
+        
+        
+        
+        
+class UserUpdatePassword(BaseModel):
+    password:Optional[str | bytes]=None
+    last_updated: int = Field(default_factory=lambda: int(time.time()))
+    @model_validator(mode='after')
+    def obscure_password(self):
+        if self.password:
+            self.password=hash_password(self.password)
+            return self
+        
+        

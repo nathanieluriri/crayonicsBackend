@@ -3,7 +3,8 @@ import asyncio
 from bson import ObjectId
 from fastapi import HTTPException
 from typing import List
-
+from bson.errors import InvalidId
+from repositories.reset_token import create_reset_token, generate_otp, get_reset_token
 from repositories.user_repo import (
     create_user,
     get_user,
@@ -11,8 +12,9 @@ from repositories.user_repo import (
     update_user,
     delete_user,
 )
-from schemas.imports import AccountStatus, LoginType
-from schemas.user_schema import UserCreate, UserUpdate, UserOut,UserBase,UserRefresh
+from schemas.imports import AccountStatus, LoginType, ResetPasswordConclusion, ResetPasswordInitiation, ResetPasswordInitiationResponse, UserType
+from schemas.reset_token import ResetTokenBase, ResetTokenCreate
+from schemas.user_schema import UserCreate, UserUpdate, UserOut,UserBase,UserRefresh, UserUpdatePassword
 from security.hash import check_password
 from security.encrypting_jwt import create_jwt_member_token, create_jwt_token
 from repositories.tokens_repo import add_refresh_tokens, add_access_tokens, accessTokenCreate,accessTokenOut,refreshTokenCreate
@@ -21,6 +23,8 @@ from authlib.integrations.starlette_client import OAuth
 import os
 from dotenv import load_dotenv
 import httpx
+
+from services.email_service import send_otp
 
 
 load_dotenv()
@@ -234,5 +238,68 @@ async def logout_user(user_id: str):
         except Exception:
             # Never block logout if Google revoke fails
             pass
+
+    return True
+
+
+
+
+
+
+
+async def user_reset_password_intiation(user_details:ResetPasswordInitiation)->ResetPasswordInitiationResponse:
+ 
+    user = await get_user(filter_dict={"email":user_details.email})
+    if user:
+         
+        OTP=generate_otp()
+        success = send_otp(otp=OTP,user_email=user_details.email)
+        if success==0:
+            token  = ResetTokenBase(userId=user.id,userType=UserType.member,otp=OTP)
+            reset_token_create  =ResetTokenCreate(**token.model_dump())
+            reset_token =  await create_reset_token(reset_token_data=reset_token_create)
+            response = ResetPasswordInitiationResponse(resetToken=reset_token.id)
+            return response
+        else: raise HTTPException(status_code=500, detail="OTP DIDN't send to the user email")
+    else: raise HTTPException(status_code=404, detail="No driver has this email on the platform")
+ 
+ 
+async def user_reset_password_conclusion(
+    user_details: ResetPasswordConclusion
+) -> bool:
+
+    # 1️⃣ Validate reset token ID
+    try:
+        reset_token_id = ObjectId(user_details.resetToken)
+    except InvalidId:
+        raise ValueError("Invalid reset token")
+
+    # 2️⃣ Fetch reset token
+    token = await get_reset_token(filter_dict={"_id": reset_token_id})
+
+    if not token:
+        raise HTTPException(status_code=404,detail="Reset token not found or expired")
+
+    # 3️⃣ Validate token user type
+    if token.userType != UserType.driver:
+        raise HTTPException(status_code=403,detail="Reset token is not for a driver")
+
+    # 4️⃣ Validate OTP
+    if token.otp != user_details.otp:
+        raise HTTPException(status_code=400,detail="Invalid OTP")
+
+    # 5️⃣ Update driver password
+    driver_update = UserUpdatePassword(
+        password=user_details.password
+    )
+
+    result = await update_user_by_id(
+        driver_id=token.userId,
+        driver_data=driver_update,
+        is_password_getting_changed=True
+    )
+
+    if not result:
+        raise HTTPException(status_code=500,detail="Failed to update driver password")
 
     return True
