@@ -47,14 +47,26 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     # Add other fields here 
+    loginType:Optional[LoginType]=None
     id: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("_id", "id"),
         serialization_alias="id",
     )
-    date_created: Optional[int] = None
+    
+    date_created: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("date_created", "dateCreated"),
+        serialization_alias="dateCreated",
+    )
+ 
     accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
-    last_updated: Optional[int] = None
+    last_updated: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("last_updated", "lastUpdated"),
+        serialization_alias="lastUpdated",
+    )
+ 
     refresh_token: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("refresh_token", "refreshToken"),

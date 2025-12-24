@@ -46,7 +46,7 @@ SUCCESS_PAGE_URL = os.getenv("SUCCESS_PAGE_URL", "http://localhost:5173/success"
 ERROR_PAGE_URL   = os.getenv("ERROR_PAGE_URL",   "http://localhost:5173/error")
 
 # --- Step 1: Redirect user to Google login ---
-@router.get("/google/auth")
+@router.get("/google/auth", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
 async def login_with_google_account(request: Request):
     redirect_uri = str(request.url_for("auth_callback_user"))
 
@@ -58,7 +58,7 @@ async def login_with_google_account(request: Request):
 
 # --- Step 2: Handle callback from Google ---
 
-@router.get("/auth/callback")
+@router.get("/auth/callback", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
 async def auth_callback_user(request: Request):
     token = await oauth.google.authorize_access_token(request)
     user_info = token.get('userinfo')
@@ -95,19 +95,19 @@ async def auth_callback_user(request: Request):
     else:
         raise HTTPException(status_code=400,detail={"status": "failed", "message": "No user info found"})
 
-@router.get("/",response_model_exclude={"data": {"__all__": {"password"}}}, response_model=APIResponse[List[UserOut]],response_model_exclude_none=True,dependencies=[Depends(verify_token_user_role)])
+@router.get("/",response_model_exclude={"data": {"__all__": {"password","loginType","oauth_access_token","oauth_refresh_token"}}}, response_model=APIResponse[List[UserOut]],response_model_exclude_none=True,dependencies=[Depends(verify_token_user_role)])
 async def list_users(start:int= 0, stop:int=100):
     items = await retrieve_users(start=0,stop=100)
     return APIResponse(status_code=200, data=items, detail="Fetched successfully")
 
-@router.get("/me", response_model_exclude={"data": {"password"}},response_model=APIResponse[UserOut],dependencies=[Depends(verify_token_user_role)],response_model_exclude_none=True)
+@router.get("/me", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}},response_model=APIResponse[UserOut],dependencies=[Depends(verify_token_user_role)],response_model_exclude_none=True)
 async def get_my_users(token:accessTokenOut = Depends(verify_token_user_role)):
     items = await retrieve_user_by_user_id(id=token.userId)
     return APIResponse(status_code=200, data=items, detail="users items fetched")
 
 
 
-@router.post("/signup", response_model_exclude={"data": {"password"}},response_model=APIResponse[UserOut])
+@router.post("/signup", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}},response_model=APIResponse[UserOut])
 async def signup_new_user(user_data:UserSignUp):
     
     new_user = UserCreate(**user_data.model_dump(),loginType=LoginType.password)
@@ -115,7 +115,7 @@ async def signup_new_user(user_data:UserSignUp):
     return APIResponse(status_code=200, data=items, detail="Fetched successfully")
 
 
-@router.post("/login",response_model_exclude={"data": {"password"}}, response_model=APIResponse[UserOut])
+@router.post("/login",response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}}, response_model=APIResponse[UserOut])
 async def login_user(user_data:UserLogin):
     user_data=UserBase(**user_data.model_dump(),loginType=LoginType.password)
     items = await authenticate_user(user_data=user_data)
