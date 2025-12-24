@@ -1,3 +1,4 @@
+from datetime import timedelta
 from schemas.imports import *
 from pydantic import AliasChoices, Field
 import time
@@ -59,7 +60,7 @@ class UserOut(UserBase):
         validation_alias=AliasChoices("date_created", "dateCreated"),
         serialization_alias="dateCreated",
     )
- 
+    date_Joined:Optional[str]=None
     accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
     last_updated: Optional[str] = Field(
         default=None,
@@ -83,7 +84,23 @@ class UserOut(UserBase):
         if "_id" in values and isinstance(values["_id"], ObjectId):
             values["_id"] = str(values["_id"])  # coerce to string before validation
         return values
-            
+    
+    
+    @model_validator(mode="after")
+    @classmethod
+    def set_date_joined(cls, model):
+        """If date_joined is None, calculate from date_created."""
+        
+        if model.date_Joined is None and model.date_created is not None:
+            # Convert timestamp to UTC datetime
+            dt_created = datetime.fromtimestamp(model.date_created, tz=timezone.utc)
+
+            # Example calculation: here we just use the same date_created (adjust as needed)
+            dt_joined = dt_created  # or dt_created + timedelta(days=1)
+
+            # Format as ISO 8601 with milliseconds and UTC offset
+            model.date_Joined = dt_joined.isoformat(timespec="milliseconds")
+        return model
     class Config:
         populate_by_name = True  # allows using `id` when constructing the model
         arbitrary_types_allowed = True  # allows ObjectId type
