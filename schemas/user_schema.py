@@ -78,6 +78,7 @@ class UserOut(UserBase):
         validation_alias=AliasChoices("access_token", "accessToken"),
         serialization_alias="accessToken",
     )
+    
     @model_validator(mode="before")
     @classmethod
     def convert_objectid(cls, values):
@@ -85,6 +86,30 @@ class UserOut(UserBase):
             values["_id"] = str(values["_id"])  # coerce to string before validation
         return values
     
+    
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_date_joined(cls, values):
+        date_joined = values.get("date_Joined")
+        date_created = values.get("date_created")
+        dt = None
+
+        if date_joined is None and date_created is not None:
+            dt = datetime.fromtimestamp(date_created, tz=timezone.utc)
+        elif isinstance(date_joined, int):
+            dt = datetime.fromtimestamp(date_joined, tz=timezone.utc)
+        elif isinstance(date_joined, datetime):
+            dt = date_joined
+        elif isinstance(date_joined, str):
+            try:
+                dt = datetime.fromisoformat(date_joined.replace("Z", "+00:00"))
+            except Exception:
+                dt = None
+
+        if dt:
+            values["date_Joined"] = dt.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+        return values
     
     @model_validator(mode="after")
     @classmethod
