@@ -79,7 +79,7 @@ async def add_user(user_data: UserCreate) -> UserOut:
         new_rider.access_token= token
         return new_rider
     else:
-        raise HTTPException(status_code=409,detail="Rider Already exists")
+        raise HTTPException(status_code=409,detail="User Already exists")
 async def authenticate_user(user_data:UserBase )->UserOut:
     user = await get_user(filter_dict={"email":user_data.email.lower()})
     if user_data.loginType==LoginType.google and user != None:
