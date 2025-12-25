@@ -61,7 +61,7 @@ async def production_login_with_google_account(request: Request):
 
 # --- Step 2: Handle callback from Google ---
 
-@router.get("/production/google/auth", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
+@router.get("/production/auth/callback", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
 async def production_auth_callback_user(request: Request):
     token = await oauth.google.authorize_access_token(request)
     user_info = token.get('userinfo')
