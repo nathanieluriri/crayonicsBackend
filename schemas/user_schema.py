@@ -60,7 +60,11 @@ class UserOut(UserBase):
         validation_alias=AliasChoices("date_created", "dateCreated"),
         serialization_alias="dateCreated",
     )
-    date_Joined:Optional[str]=None
+    date_Joined:Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("date_Joined", "dateJoined"),
+        serialization_alias="dateJoined",
+    )
     accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
     last_updated: Optional[int] = Field(
         default=None,
