@@ -45,6 +45,85 @@ router = APIRouter(prefix="/users", tags=["Users"])
 SUCCESS_PAGE_URL = os.getenv("SUCCESS_PAGE_URL", "http://localhost:5173/success")
 ERROR_PAGE_URL   = os.getenv("ERROR_PAGE_URL",   "http://localhost:5173/error")
 
+PRODUCTION_SUCCESS_PAGE_URL = os.getenv("PRODUCTION_SUCCESS_PAGE_URL", "https://crayonics.vercel.app/success")
+PRODUCTION_ERROR_PAGE_URL   = os.getenv("PRODUCTION_ERROR_PAGE_URL",   "https://crayonics.vercel.app/error")
+
+# --- Step 1: Redirect user to Google login ---
+@router.get("/production/google/auth", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
+async def production_login_with_google_account(request: Request):
+    redirect_uri = str(request.url_for("production_auth_callback_user"))
+
+    # Force https
+    redirect_uri = re.sub(r"^http://", "https://", redirect_uri)
+
+    print("REDIRECT URI:", redirect_uri)
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+# --- Step 2: Handle callback from Google ---
+
+@router.get("/production/google/auth", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
+async def production_auth_callback_user(request: Request):
+    token = await oauth.google.authorize_access_token(request)
+    user_info = token.get('userinfo')
+    google_access_token = token.get("access_token")
+    google_refresh_token = token.get("refresh_token")
+    # Just print or return user info for now
+    if user_info:
+        print("✅ Google user info:", user_info)
+        
+        rider = UserBase(firstName=user_info['name'],password='',lastName=user_info['given_name'],email=user_info['email'],loginType=LoginType.google,oauth_access_token= google_access_token,oauth_refresh_token= google_refresh_token)
+        data = await authenticate_user(user_data=rider)
+        if data==None:
+            new_rider = UserCreate(**rider.model_dump())
+            items = await add_user(user_data=new_rider)
+            
+            access_token = items.access_token
+            refresh_token = items.refresh_token
+            success_url = f"{SUCCESS_PAGE_URL}?access_token={access_token}&refresh_token={refresh_token}"
+            return RedirectResponse(
+            url=success_url,
+            status_code=status.HTTP_302_FOUND
+        )
+        access_token = data.access_token
+        refresh_token = data.refresh_token
+
+         
+
+        success_url = f"{PRODUCTION_SUCCESS_PAGE_URL}?access_token={access_token}&refresh_token={refresh_token}"
+
+        return RedirectResponse(
+            url=success_url,
+            status_code=status.HTTP_302_FOUND
+        )
+    else:
+        PRODUCTION_ERROR_PAGE_URL_PAGE=f"{PRODUCTION_ERROR_PAGE_URL}?status=400&message=No user info found"
+        return RedirectResponse(
+            url=PRODUCTION_ERROR_PAGE_URL_PAGE,
+            status_code=status.HTTP_302_FOUND
+        )
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # --- Step 1: Redirect user to Google login ---
 @router.get("/google/auth", response_model_exclude={"data": {"password","loginType","oauth_access_token","oauth_refresh_token"}})
 async def login_with_google_account(request: Request):

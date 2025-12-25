@@ -141,7 +141,7 @@ def send_otp(otp: str, user_email:str,):
 
         send_html_email_optimized(
             sender_email=EMAIL_USERNAME,
-            sender_display_name="Aperture Security",
+            sender_display_name="Crayonics",
             receiver_email=user_email,
             subject="OTP",
             html_content=html_body,
