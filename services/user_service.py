@@ -191,7 +191,7 @@ async def update_user_by_id(driver_id: str, driver_data: UserUpdate,is_password_
     """
     from celery_worker import celery_app
     if not ObjectId.is_valid(driver_id):
-        raise HTTPException(status_code=400, detail="Invalid driver ID format")
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
 
     filter_dict = {"_id": ObjectId(driver_id)}
     result = await update_user(filter_dict, driver_data)
@@ -300,6 +300,6 @@ async def user_reset_password_conclusion(
     )
 
     if not result:
-        raise HTTPException(status_code=500,detail="Failed to update driver password")
+        raise HTTPException(status_code=500,detail="Failed to update user password")
 
     return True
