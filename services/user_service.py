@@ -261,7 +261,7 @@ async def user_reset_password_intiation(user_details:ResetPasswordInitiation)->R
             response = ResetPasswordInitiationResponse(resetToken=reset_token.id)
             return response
         else: raise HTTPException(status_code=500, detail="OTP DIDN't send to the user email")
-    else: raise HTTPException(status_code=404, detail="No driver has this email on the platform")
+    else: raise HTTPException(status_code=404, detail="No user has this email on the platform")
  
  
 async def user_reset_password_conclusion(
