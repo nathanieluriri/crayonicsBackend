@@ -55,14 +55,14 @@ class UserOut(UserBase):
         serialization_alias="id",
     )
     
-    date_created: Optional[str] = Field(
+    date_created: Optional[int] = Field(
         default=None,
         validation_alias=AliasChoices("date_created", "dateCreated"),
         serialization_alias="dateCreated",
     )
     date_Joined:Optional[str]=None
     accountStatus:Optional[AccountStatus]=AccountStatus.ACTIVE
-    last_updated: Optional[str] = Field(
+    last_updated: Optional[int] = Field(
         default=None,
         validation_alias=AliasChoices("last_updated", "lastUpdated"),
         serialization_alias="lastUpdated",
