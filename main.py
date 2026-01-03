@@ -74,6 +74,16 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
     
     
     
+
+origins = [
+    "https://nattyboi-resume-api.hf.space/",
+    "https://www.crayonics.co",
+    "https://crayonics.vercel.app",
+    "http://localhost:5173",      # Vite default
+    "http://127.0.0.1:5173",
+]
+
+
     
 # Create the FastAPI app
 app = FastAPI(
@@ -85,6 +95,14 @@ app = FastAPI(
 app.add_middleware(RequestTimingMiddleware)
 app.add_middleware(SessionMiddleware, secret_key="some-random-string")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],   # or ["GET", "POST", "PUT", "DELETE"]
+    allow_headers=["*"],
+)
+    
 redis_url = os.getenv("CELERY_BROKER_URL") or os.getenv("REDIS_URL") \
     or f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0"
 
